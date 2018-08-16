@@ -216,7 +216,7 @@ export class App {
     }
   }
 
-  checkForAuthorizationResponse(authcompletionCallback?: Function) {
+  checkForAuthorizationResponse(authCompletionCallback?: Function, logoutCompletionCallback?: Function) {
     var isAuthRequestComplete = false;
     switch (this.configuration.toJson().oauth_flow_type) {
       case FLOW_TYPE_IMPLICIT:
@@ -234,12 +234,17 @@ export class App {
 
     if (isAuthRequestComplete) {
       this.authorizationHandler.completeAuthorizationRequestIfPossible();
+
+      if(authCompletionCallback) {
+        authCompletionCallback();
+      }
+
     } else {
       this.endSessionHandler.completeEndSessionRequestIfPossible();
-    }
 
-    if(authcompletionCallback) {
-      authcompletionCallback();
+      if(logoutCompletionCallback) {
+        logoutCompletionCallback();
+      }
     }
   }
 

@@ -45,7 +45,7 @@ export declare abstract class EndSessionRequestHandler {
     /**
      * Completes the endsession request if necessary & when possible.
      */
-    completeEndSessionRequestIfPossible(): void;
+    completeEndSessionRequestIfPossible(): Promise<void>;
     /**
      * Sets the default EndSession Service notifier.
      */

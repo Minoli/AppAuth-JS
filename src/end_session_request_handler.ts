@@ -113,7 +113,7 @@ export abstract class EndSessionRequestHandler {
   /**
    * Completes the endsession request if necessary & when possible.
    */
-  completeEndSessionRequestIfPossible(): void {
+  completeEndSessionRequestIfPossible(): Promise<void> {
     // call complete endsession if possible to see there might
     // be a response that needs to be delivered.
     log(`Checking to see if there is an endsession response to be delivered.`);
@@ -121,7 +121,7 @@ export abstract class EndSessionRequestHandler {
       log(`Notifier is not present on EndSessionRequest handler.
           No delivery of result will be possible`)
     }
-    this.completeEndSessionRequest().then(result => {
+    return this.completeEndSessionRequest().then(result => {
       if (!result) {
         log(`No result is available yet.`);
       }

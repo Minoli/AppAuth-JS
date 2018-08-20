@@ -156,7 +156,7 @@ export class App {
     this.endSessionHandler.setEndSessionNotifier(this.endSessionNotifier);
     // set a listener to listen for authorization responses
     this.endSessionNotifier.setEndSessionListener((request, response, error) => {
-      console.log('Authorization request complete ', request, response, error);
+      console.log('End session request complete ', request, response, error);
       if(endSessionListenerCallback) {
         endSessionListenerCallback(request, response, error);
       }
@@ -216,8 +216,10 @@ export class App {
     }
   }
 
-  checkForAuthorizationResponse(authCompletionCallback?: Function, logoutCompletionCallback?: Function) {
+  checkForAuthorizationResponse(): Promise<void> {
+
     var isAuthRequestComplete = false;
+
     switch (this.configuration.toJson().oauth_flow_type) {
       case FLOW_TYPE_IMPLICIT:
         var params = this.parseQueryString(location, true);
@@ -233,18 +235,10 @@ export class App {
     }
 
     if (isAuthRequestComplete) {
-      this.authorizationHandler.completeAuthorizationRequestIfPossible();
-
-      if(authCompletionCallback) {
-        authCompletionCallback();
-      }
+      return this.authorizationHandler.completeAuthorizationRequestIfPossible();
 
     } else {
-      this.endSessionHandler.completeEndSessionRequestIfPossible();
-
-      if(logoutCompletionCallback) {
-        logoutCompletionCallback();
-      }
+      return this.endSessionHandler.completeEndSessionRequestIfPossible();
     }
   }
 

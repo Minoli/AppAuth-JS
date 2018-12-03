@@ -21,13 +21,8 @@ import {log} from '../logger';
 import {RedirectRequestHandler} from '../redirect_based_handler';
 import {GRANT_TYPE_AUTHORIZATION_CODE, TokenRequest} from '../token_request';
 import { FLOW_TYPE_IMPLICIT, FLOW_TYPE_PKCE, AUTHORIZATION_RESPONSE_HANDLE_KEY } from '../types';
-import { PKCETokenRequestHandler } from '../pkce_token_requestor';
 import { LocalStorageBackend, StorageBackend } from '../storage';
-import { EndSessionRedirectRequestHandler } from '../end_session_redirect_based_handler';
-import { EndSessionRequestHandler, EndSessionNotifier } from '../end_session_request_handler';
-import { EndSessionRequest } from '../end_session_request';
 import { cryptoGenerateRandom } from '../crypto_utils';
-import { UserInfoRequestHandler, BaseUserInfoRequestHandler } from '../user_info_request_handler';
 
 /**
  * The wrapper appication.
@@ -54,11 +49,6 @@ export class App {
 
   private notifier: AuthorizationNotifier;
   private authorizationHandler: AuthorizationRequestHandler;
-  private pkceTokenRequestHandler: PKCETokenRequestHandler;
-  private userInfoRequestHandler: UserInfoRequestHandler;
-
-  private endSessionNotifier: EndSessionNotifier;
-  private endSessionHandler: EndSessionRequestHandler;
 
   private configuration: AuthorizationServiceConfiguration;
 
@@ -113,16 +103,13 @@ export class App {
 
     this.notifier = new AuthorizationNotifier();
     this.authorizationHandler = new RedirectRequestHandler();
-
-    this.pkceTokenRequestHandler = new PKCETokenRequestHandler(this.authorizationHandler, this.configuration, this.userStore);
-    this.userInfoRequestHandler = new BaseUserInfoRequestHandler(this.userStore);
-
-    this.endSessionNotifier = new EndSessionNotifier();
-    // uses a redirect flow
-    this.endSessionHandler = new EndSessionRedirectRequestHandler();
   }
 
-  init(authorizationListenerCallback?: Function, endSessionListenerCallback?: Function) {
+  getConfiguration() {
+    return this.configuration;
+  }
+
+  init(authorizationListenerCallback?: Function) {
     // set notifier to deliver responses
     this.authorizationHandler.setAuthorizationNotifier(this.notifier);
     // set a listener to listen for authorization responses
@@ -130,35 +117,9 @@ export class App {
       log('Authorization request complete ', request, response, error);
       if (response) {
         this.showMessage(`Authorization Code ${response.code}`);
-
-        if (this.configuration.toJson().oauth_flow_type == FLOW_TYPE_PKCE && response.code) {
-          let tokenRequestExtras = {
-            client_secret: (this.clientSecret == null ? '' : this.clientSecret),
-            state: response.state
-          };
-          let request = new TokenRequest(
-              this.clientId,
-              this.redirectUri,
-              GRANT_TYPE_AUTHORIZATION_CODE,
-              response.code,
-              undefined,
-              tokenRequestExtras);
-          this.pkceTokenRequestHandler.performPKCEAuthorizationTokenRequest(
-              this.configuration, request);
-        }
       }
       if(authorizationListenerCallback) {
         authorizationListenerCallback(request, response, error);
-      }
-    });
-
-    // set notifier to deliver responses
-    this.endSessionHandler.setEndSessionNotifier(this.endSessionNotifier);
-    // set a listener to listen for authorization responses
-    this.endSessionNotifier.setEndSessionListener((request, response, error) => {
-      console.log('End session request complete ', request, response, error);
-      if(endSessionListenerCallback) {
-        endSessionListenerCallback(request, response, error);
       }
     });
   }
@@ -203,20 +164,10 @@ export class App {
       // make the authorization request
       this.authorizationHandler.performAuthorizationRequest(this.configuration, request);
 
-    } else if (this.configuration.toJson().oauth_flow_type == FLOW_TYPE_PKCE) {
-      let authRequestExtras = {prompt: 'consent', access_type: 'online'};
-      request = new AuthorizationRequest(
-          this.clientId,
-          this.redirectUri,
-          this.scope,
-          AuthorizationRequest.RESPONSE_TYPE_CODE,
-          state, /* state */
-          authRequestExtras);
-      this.pkceTokenRequestHandler.performPKCEAuthorizationCodeRequest(this.configuration, request);
     }
   }
 
-  checkForAuthorizationResponse(): Promise<void> {
+  checkForAuthorizationResponse(): Promise<void>|void {
 
     var isAuthRequestComplete = false;
 
@@ -225,54 +176,12 @@ export class App {
         var params = this.parseQueryString(location, true);
         isAuthRequestComplete = params.hasOwnProperty('id_token');
         break;
-      case FLOW_TYPE_PKCE:
-        var params = this.parseQueryString(location, false);
-        isAuthRequestComplete = params.hasOwnProperty('code');
-        break;
-      default:
-        var params = this.parseQueryString(location, true);
-        isAuthRequestComplete = params.hasOwnProperty('id_token');
     }
 
     if (isAuthRequestComplete) {
       return this.authorizationHandler.completeAuthorizationRequestIfPossible();
 
-    } else {
-      return this.endSessionHandler.completeEndSessionRequestIfPossible();
     }
-  }
-
-  makeLogoutRequest(state?: string) {
-    // generater state
-    if(!state) {
-      state = App.generateState();
-    }
-
-    this.userStore.getItem(AUTHORIZATION_RESPONSE_HANDLE_KEY).then(result => {
-      if (result != null) {
-        this.idTokenHandler(result, state);
-      } else {
-        console.log('Authorization response is not found in local or session storage');
-      }
-    });
-  }
-
-  idTokenHandler(result: string, state?: string): void {
-    var authResponse = JSON.parse(result);
-    var idTokenHint = authResponse.id_token;
-
-    let request = new EndSessionRequest(
-        idTokenHint, this.postLogoutRedirectUri, state /* state */, {client_id: this.clientId});
-
-    // make the authorization request
-    this.endSessionHandler.performEndSessionRequest(this.configuration, request);
-  }
-
-  makeUserInfoRequest() {
-    return this.userInfoRequestHandler.performUserInfoRequest(this.configuration)
-    .then(userInfoResponse => {
-      return userInfoResponse.toJson();
-    });
   }
 
   showMessage(message: string) {

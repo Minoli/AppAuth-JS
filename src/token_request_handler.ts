@@ -20,7 +20,6 @@ import {RevokeTokenRequest} from './revoke_token_request';
 import {TokenRequest} from './token_request';
 import {TokenError, TokenErrorJson, TokenResponse, TokenResponseJson} from './token_response';
 import {StringMap} from './types';
-import {UserInfoRequest} from './user_info_request';
 import {JQueryRequestor, Requestor} from './xhr';
 
 
